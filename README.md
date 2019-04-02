@@ -18,6 +18,8 @@ docker-compose version 1.23+
 3. Run ./bootstrap.sh
 ```
 
+[![asciicast](https://asciinema.org/a/Q2Y6gMOPiJ9Yobaobqfabub8Y.png)](https://asciinema.org/a/Q2Y6gMOPiJ9Yobaobqfabub8Y)
+
 ### Testing
 
 Run tests
