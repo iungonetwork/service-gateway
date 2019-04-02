@@ -14,7 +14,7 @@ docker-compose version 1.23+
 
 ```
 1. Clone repo and `cd service-gateway`
-2. Make file executable chmod +x bootstrap.sh
+2. Make file executable `chmod +x bootstrap.sh`
 3. Run ./bootstrap.sh
 ```
 
