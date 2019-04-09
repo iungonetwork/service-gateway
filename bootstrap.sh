@@ -1,5 +1,7 @@
 #!/bin/bash
 
+mkdir .data
+
 cat << EOF > docker-compose.yml
 version: "3.5"
 
@@ -126,6 +128,35 @@ services:
     volumes:
       - ./.data/test:/tmp
 
+  geth:
+    image: ethereum/client-go:alpine
+    command: --testnet --syncmode fast --ws --wsaddr 0.0.0.0 --wsapi "eth,web3,net" --wsorigins "*" --verbosity=1
+    ports:
+      - 8545:8545
+      - 8546:8546
+    volumes:
+      - .data/geth:/root/.ethereum
+    networks:
+      default:
+        ipv4_address: 172.28.1.18  
+
+  payments-token:
+    image: docker.iungo.network/payments-token
+    environment:
+      WEB3_WS_PROVIDER_URI: http://geth:8546
+      TOKEN: INGX
+      TOKEN_DECIMALS: 4
+      CONTRACT_ADDRESS: '0x05CE1108d503a6b1d66Ca79f54E9bC537222c36E'
+      AMQP_URI: amqp://user:pass@rabbitmq:5672
+      AMQP_QUEUE: billing
+      REDIS_HOST: redis
+    depends_on:
+      - redis
+      - geth
+    networks:
+      default:
+        ipv4_address: 172.28.1.19
+
 networks:
   default:
     name: service
@@ -168,3 +199,13 @@ docker-compose up -d freeradius
 docker-compose exec mysql mysql -uroot -proot -e "CREATE DATABASE security"
 docker-compose run --rm controller cat /app/security.sql | docker-compose exec -T mysql mysql -uroot -proot security
 docker-compose up -d controller security
+
+# Setup payments
+docker-compose up -d geth payments-token
+mkdir -p .data/payments/token
+echo "Generating wallet mnemonic"
+docker-compose exec payments-token node src/util/generate_mnemonic.js | tr -d "\r\n" > .data/payments/token/wallet-mnemonic
+echo "Generating wallet addresses"
+docker-compose exec payments-token node src/util/generate_wallet.js "$(cat .data/payments/token/wallet-mnemonic)" 1000 > .data/payments/token/wallet-addresses
+echo "Setting up wallet address pool"
+cat .data/payments/token/wallet-addresses | tr -d '\r' | tr '\n' '\0' | docker-compose exec -T payments-token xargs -0 -L1 -I'%' curl -s -d"{\"address\": \"%\"}" -H "Content-Type: application/json" payments-token/pool/free > /dev/null
